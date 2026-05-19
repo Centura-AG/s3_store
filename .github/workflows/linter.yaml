@@ -1,0 +1,11 @@
+name: Run Linter
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linter:
+    uses: Centura-AG/centura_workflows/.github/workflows/linter.yaml@develop
+    with:
+      app_path: ${{ github.event.repository.name }}

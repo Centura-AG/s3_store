@@ -1,0 +1,17 @@
+name: Version Tag Creator
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  call-version-tag-workflow:
+    uses: Centura-AG/centura_workflows/.github/workflows/create-version-based-on-tag.yaml@develop
+    permissions:
+      contents: write
+    with:
+      package_path: ${{ github.event.repository.name }}
+      pushed_tag: ${{ github.ref_name }}
+    secrets:
+      CENTURA_TAGGER_APP_PK: ${{ secrets.CENTURA_TAGGER_APP_PK }}

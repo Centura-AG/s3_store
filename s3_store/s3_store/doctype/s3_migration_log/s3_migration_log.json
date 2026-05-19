@@ -1,0 +1,106 @@
+{
+  "actions": [],
+  "autoname": "format:S3-MIG-{####}",
+  "creation": "2026-05-19 12:00:00",
+  "doctype": "DocType",
+  "document_type": "System",
+  "engine": "InnoDB",
+  "field_order": [
+    "status",
+    "started_at",
+    "completed_at",
+    "column_break_counts",
+    "total_files",
+    "migrated",
+    "failed",
+    "errors_section",
+    "errors"
+  ],
+  "fields": [
+    {
+      "default": "Queued",
+      "fieldname": "status",
+      "fieldtype": "Select",
+      "in_list_view": 1,
+      "label": "Status",
+      "options": "Queued\nRunning\nCompleted\nFailed",
+      "read_only": 1
+    },
+    {
+      "fieldname": "started_at",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "Started At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "completed_at",
+      "fieldtype": "Datetime",
+      "in_list_view": 1,
+      "label": "Completed At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "column_break_counts",
+      "fieldtype": "Column Break"
+    },
+    {
+      "default": "0",
+      "fieldname": "total_files",
+      "fieldtype": "Int",
+      "in_list_view": 1,
+      "label": "Total Files",
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "fieldname": "migrated",
+      "fieldtype": "Int",
+      "in_list_view": 1,
+      "label": "Migrated",
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "fieldname": "failed",
+      "fieldtype": "Int",
+      "in_list_view": 1,
+      "label": "Failed",
+      "read_only": 1
+    },
+    {
+      "fieldname": "errors_section",
+      "fieldtype": "Section Break",
+      "label": "Errors"
+    },
+    {
+      "fieldname": "errors",
+      "fieldtype": "Long Text",
+      "label": "Errors",
+      "read_only": 1
+    }
+  ],
+  "index_web_pages_for_search": 0,
+  "links": [],
+  "modified": "2026-05-19 12:00:00",
+  "modified_by": "Administrator",
+  "module": "S3 Store",
+  "name": "S3 Migration Log",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 0,
+      "email": 0,
+      "print": 1,
+      "read": 1,
+      "role": "System Manager",
+      "share": 0,
+      "write": 1
+    }
+  ],
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 0
+}
