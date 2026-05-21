@@ -19,6 +19,26 @@ from .doctype.s3_store_settings.s3_store_settings import S3StoreSettings
 
 SERVE_PATH = "/api/method/s3_store.s3_store.api.serve"
 
+# Types that browsers execute — never upload with these as ContentType.
+_BLOCKED_CONTENT_TYPES = frozenset(
+    {
+        "text/html",
+        "text/javascript",
+        "application/javascript",
+        "application/x-javascript",
+        "application/xhtml+xml",
+        "application/x-httpd-php",
+        "text/x-php",
+    }
+)
+
+
+def _safe_content_type(ct: str | None) -> str:
+    base = (ct or "").split(";")[0].strip().lower()
+    if base in _BLOCKED_CONTENT_TYPES:
+        return "application/octet-stream"
+    return ct or "application/octet-stream"
+
 
 def _get_settings() -> S3StoreSettings | None:
     try:
@@ -41,17 +61,19 @@ def write_file(doc):
     if isinstance(doc._content, str):
         doc._content = doc._content.encode()
 
-    content_type = (
-        doc.content_type
-        or (doc.file_name and mimetypes.guess_type(doc.file_name)[0])
-        or "application/octet-stream"
+    content_type = _safe_content_type(
+        doc.content_type or (doc.file_name and mimetypes.guess_type(doc.file_name)[0])
     )
     key = s3_client.make_key(
         settings.key_prefix, doc.attached_to_doctype or "Misc", doc.file_name
     )
     is_private = bool(doc.is_private)
 
-    s3_client.upload(key, BytesIO(doc._content), content_type, is_private, settings)
+    try:
+        s3_client.upload(key, BytesIO(doc._content), content_type, is_private, settings)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), f"S3 Store upload {key}")
+        raise
 
     doc.file_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
 

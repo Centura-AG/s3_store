@@ -32,7 +32,14 @@ def _local_path_for(file_url: str, is_private: bool) -> str:
     # /private/files/foo.png -> sites/<site>/private/files/foo.png
     base = get_files_path(is_private=1 if is_private else 0)
     name = file_url.rsplit("/", 1)[-1]
-    return os.path.join(base, name)
+    resolved = os.path.realpath(os.path.join(base, name))
+    base_real = os.path.realpath(base)
+    if not (resolved == base_real or resolved.startswith(base_real + os.sep)):
+        frappe.throw(
+            _("Invalid file path in file_url: {0}").format(file_url),
+            frappe.PermissionError,
+        )
+    return resolved
 
 
 def _iter_local_files():
@@ -71,6 +78,7 @@ def _upload_local_file(row, settings, delete_local: bool) -> tuple[bool, str | N
         frappe.db.set_value(
             "File", row["name"], "file_url", new_url, update_modified=False
         )
+        frappe.db.commit()  # Commit each rewrite so a crash/retry never re-uploads the same file  # nosemgrep: frappe-manual-commit
 
         if delete_local:
             try:
@@ -80,7 +88,7 @@ def _upload_local_file(row, settings, delete_local: bool) -> tuple[bool, str | N
 
         return True, None
     except Exception as e:
-        return False, f"{row['name']}: {str(e).splitlines()[0][:200]}"
+        return False, f"{row['name']}: {str(e)[:500]}"
 
 
 def run(log_name: str):

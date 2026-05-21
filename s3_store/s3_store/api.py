@@ -23,6 +23,8 @@ def serve(key: str):
     from .file_handler import SERVE_PATH
 
     raw_key = unquote(key)
+    if ".." in raw_key or raw_key.startswith("/"):
+        frappe.throw(_("Invalid file key"), frappe.PermissionError)
     expected_url = f"{SERVE_PATH}?key={quote(raw_key, safe='')}"
     file_name = frappe.db.get_value("File", {"file_url": expected_url}, "name")
 
@@ -37,11 +39,16 @@ def serve(key: str):
         frappe.throw(_("S3 Store is not enabled"))
 
     obj = s3_client.get_object(raw_key, settings)
+    body = obj["Body"]
+    try:
+        filecontent = body.read()
+    finally:
+        body.close()
     frappe.local.response.update(
         {
             "type": "download",
             "filename": os.path.basename(file_doc.file_name or raw_key),
-            "filecontent": obj["Body"].read(),
+            "filecontent": filecontent,
             "content_type": obj.get("ContentType", "application/octet-stream"),
             "display_content_as": "inline",
         }

@@ -87,7 +87,7 @@
     },
     {
       "default": "3600",
-      "description": "Presigned URL expiry in seconds.",
+      "description": "Reserved for future use. Currently unused — all file serving goes through the backend proxy endpoint.",
       "fieldname": "signed_url_expiry",
       "fieldtype": "Int",
       "label": "Signed URL Expiry"

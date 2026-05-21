@@ -3,15 +3,18 @@ argument so they're trivially mockable in tests and stateless at the module leve
 
 from __future__ import annotations
 
+import contextlib
 import functools
+import logging
 from typing import TYPE_CHECKING, BinaryIO
-from urllib.parse import quote
 
 import boto3
 from botocore.client import Config
 
 if TYPE_CHECKING:
     from .doctype.s3_store_settings.s3_store_settings import S3StoreSettings
+
+logger = logging.getLogger(__name__)
 
 
 @functools.lru_cache(maxsize=4)
@@ -44,32 +47,26 @@ def upload(
     settings: "S3StoreSettings",
 ) -> None:
     extra = {"ContentType": content_type or "application/octet-stream"}
+    logger.debug("S3 upload: bucket=%s key=%s", settings.bucket, key)
     _client(settings).upload_fileobj(fileobj, settings.bucket, key, ExtraArgs=extra)
+    logger.debug("S3 upload complete: key=%s", key)
 
 
 def download_to_path(key: str, path: str, settings: "S3StoreSettings") -> None:
+    logger.debug("S3 download: bucket=%s key=%s -> %s", settings.bucket, key, path)
     _client(settings).download_file(settings.bucket, key, path)
+    logger.debug("S3 download complete: key=%s", key)
 
 
 def delete(key: str, settings: "S3StoreSettings") -> None:
+    logger.debug("S3 delete: bucket=%s key=%s", settings.bucket, key)
     _client(settings).delete_object(Bucket=settings.bucket, Key=key)
+    logger.debug("S3 delete complete: key=%s", key)
 
 
-def presigned_url(
-    key: str,
-    filename: str,
-    expiry: int,
-    settings: "S3StoreSettings",
-) -> str:
-    encoded = quote(filename, safe="")
-    params = {
-        "Bucket": settings.bucket,
-        "Key": key,
-        "ResponseContentDisposition": f"inline; filename*=UTF-8''{encoded}",
-    }
-    return _client(settings).generate_presigned_url(
-        "get_object", Params=params, ExpiresIn=expiry
-    )
+def clear_client_cache() -> None:
+    """Invalidate all cached boto3 clients. Call after credential rotation."""
+    _cached_client.cache_clear()
 
 
 def get_object(key: str, settings: "S3StoreSettings") -> dict:
@@ -91,7 +88,15 @@ def head(key: str, settings: "S3StoreSettings") -> dict:
 
 
 def verify_connection(settings: "S3StoreSettings") -> None:
-    _client(settings).head_bucket(Bucket=settings.bucket)
+    import secrets
+
+    client = _client(settings)
+    client.head_bucket(Bucket=settings.bucket)
+    # Probe write + delete to catch missing PutObject/DeleteObject IAM permissions.
+    probe_key = f".s3_store_probe_{secrets.token_hex(8)}"
+    client.put_object(Bucket=settings.bucket, Key=probe_key, Body=b"")
+    with contextlib.suppress(Exception):
+        client.delete_object(Bucket=settings.bucket, Key=probe_key)
 
 
 def make_key(pattern: str, doctype: str, file_name: str) -> str:
@@ -106,9 +111,10 @@ def make_key(pattern: str, doctype: str, file_name: str) -> str:
     from datetime import datetime, timezone
 
     token = secrets.token_hex(4)
-    sanitized = re.sub(r"[^\w.\-]", "_", file_name or "file")
+    # Explicit ASCII allow-list: \w matches Unicode in Python, so pin to ASCII only.
+    sanitized = re.sub(r"[^a-zA-Z0-9.\-_]", "_", file_name or "file")
     date_part = datetime.now(timezone.utc).strftime("%Y/%m/%d")
-    dt_part = re.sub(r"[^\w\-]", "_", doctype or "Misc")
+    dt_part = re.sub(r"[^a-zA-Z0-9\-_]", "_", doctype or "Misc")
 
     template = (
         f"{pattern.rstrip('/')}/{{date}}/{{doctype}}/{{token}}_{{filename}}"

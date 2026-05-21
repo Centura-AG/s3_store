@@ -77,8 +77,12 @@ def patch_backup_generator() -> None:
         return
     _ORIGINAL_BACKUP_FILES = BackupGenerator.backup_files
     _ORIGINAL_GET_RECENT = BackupGenerator.get_recent_backup
-    BackupGenerator.backup_files = _patched_backup_files  # nosemgrep: frappe-monkey-patching-not-allowed
-    BackupGenerator.get_recent_backup = _patched_get_recent_backup  # nosemgrep: frappe-monkey-patching-not-allowed
+    BackupGenerator.backup_files = (
+        _patched_backup_files  # nosemgrep: frappe-monkey-patching-not-allowed
+    )
+    BackupGenerator.get_recent_backup = (
+        _patched_get_recent_backup  # nosemgrep: frappe-monkey-patching-not-allowed
+    )
     _PATCHED = True
 
 
@@ -109,7 +113,7 @@ def _s3_enabled_for_current_site() -> bool:
     return bool(settings.enabled and settings.include_in_native_backup)
 
 
-def _iter_s3_file_rows(settings) -> list[tuple[dict, str]]:
+def _iter_s3_file_rows(settings: object) -> list[tuple[dict, str]]:
     """All File rows whose URL resolves to an S3 key under our bucket.
 
     Pulls both presigned-serve URLs and any HTTP(S) URLs (which `extract_key_from_url`
@@ -169,6 +173,12 @@ def _stage_s3_files():
                     "S3 Store backup staging",
                 )
                 continue
+            if local_path.is_symlink():
+                frappe.log_error(
+                    f"S3 staging: refusing to write to symlink {local_path}",
+                    "S3 Store backup staging",
+                )
+                continue
             if local_path.exists():
                 continue  # mixed-mode: pre-existing local copy wins
             local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,6 +187,9 @@ def _stage_s3_files():
                 staged.append(local_path)
                 staged_paths.add(local_path)
             except Exception as e:
+                # Remove any partial file left by a failed download before logging.
+                with contextlib.suppress(FileNotFoundError):
+                    local_path.unlink()
                 # Don't abort the whole backup — log and continue. The missing file
                 # just won't be in the tar; the DB still has the File record so the
                 # user can investigate.
@@ -192,7 +205,7 @@ def _stage_s3_files():
         _release_lock(lock_handle, lock_path)
 
 
-def _preflight_disk_space(settings) -> None:
+def _preflight_disk_space(settings: object) -> None:
     """Abort early if there isn't ~110% of S3 content size free locally."""
     total = sum(row["file_size"] or 0 for row, _ in _iter_s3_file_rows(settings))
     if not total:
@@ -227,13 +240,10 @@ def _acquire_lock(lock_path: Path):
 
 
 def _release_lock(fh, lock_path: Path) -> None:
-    import fcntl
-
     if fh is None:
         return
-    try:
-        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
-    finally:
-        fh.close()
-        with contextlib.suppress(FileNotFoundError):
-            lock_path.unlink()
+    # Unlink before closing: new openers get a fresh inode so they can't
+    # race to acquire the lock on the same file we're about to release.
+    with contextlib.suppress(FileNotFoundError):
+        lock_path.unlink()
+    fh.close()
