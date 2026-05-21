@@ -1,0 +1,22 @@
+exclude: 'node_modules|.git'
+default_stages: [commit]
+fail_fast: false
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      - id: ruff
+        name: 'Run Ruff linter'
+        args: [--fix]
+      - id: ruff-format
+        name: 'Run Ruff formatter'
+
+  - repo: local
+    hooks:
+      - id: prettier
+        name: 'Run Prettier formatter'
+        entry: npm run prettier
+        language: system
+        pass_filenames: false
+        types_or: [javascript, vue, css, html, json, yaml, markdown]

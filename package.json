@@ -1,0 +1,14 @@
+{
+  "name": "s3_store",
+  "scripts": {
+    "prettier": "npx prettier . --write",
+    "fixtures:sort": "for file in $(find $(basename \"$PWD\")/fixtures -type f -name '*.json'); do jq 'sort_by(.name)' \"$file\" | prettier --parser json > \"$file.tmp\" && mv \"$file.tmp\" \"$file\"; done",
+    "ruff": "ruff check . --fix && ruff format .",
+    "format": "npm run prettier && npm run fixtures:sort && npm run ruff"
+  },
+  "author": "Centura AG",
+  "dependencies": {},
+  "devDependencies": {
+    "prettier": "3.8.3"
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "actions": [],
+  "creation": "2026-05-19 12:00:00",
+  "doctype": "DocType",
+  "document_type": "System",
+  "engine": "InnoDB",
+  "field_order": [
+    "enabled",
+    "connection_section",
+    "endpoint_url",
+    "region",
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "bucket_section",
+    "bucket",
+    "key_prefix",
+    "serving_section",
+    "signed_url_expiry",
+    "delete_from_s3",
+    "backup_section",
+    "include_in_native_backup",
+    "auto_push_after_migrate",
+    "delete_local_after_push",
+    "advanced_section",
+    "ignored_doctypes"
+  ],
+  "fields": [
+    {
+      "default": "0",
+      "description": "Master switch. When off, files are written to the local filesystem as usual.",
+      "fieldname": "enabled",
+      "fieldtype": "Check",
+      "label": "Enabled"
+    },
+    {
+      "fieldname": "connection_section",
+      "fieldtype": "Section Break",
+      "label": "Connection"
+    },
+    {
+      "description": "Leave blank for AWS S3. Set for MinIO / other S3-compatible endpoints, e.g. https://minio.example.com",
+      "fieldname": "endpoint_url",
+      "fieldtype": "Data",
+      "label": "Endpoint URL"
+    },
+    {
+      "default": "us-east-1",
+      "fieldname": "region",
+      "fieldtype": "Data",
+      "label": "Region"
+    },
+    {
+      "fieldname": "aws_access_key_id",
+      "fieldtype": "Password",
+      "label": "AWS Access Key ID",
+      "mandatory_depends_on": "eval:doc.enabled"
+    },
+    {
+      "fieldname": "aws_secret_access_key",
+      "fieldtype": "Password",
+      "label": "AWS Secret Access Key",
+      "mandatory_depends_on": "eval:doc.enabled"
+    },
+    {
+      "fieldname": "bucket_section",
+      "fieldtype": "Section Break",
+      "label": "Bucket"
+    },
+    {
+      "fieldname": "bucket",
+      "fieldtype": "Data",
+      "label": "Bucket",
+      "mandatory_depends_on": "eval:doc.enabled"
+    },
+    {
+      "default": "{date}/{doctype}/{token}_{filename}",
+      "description": "Key template. Variables: {date} (YYYY/MM/DD), {doctype}, {token} (8-char hex), {filename}. A plain string without { is used as a prefix.",
+      "fieldname": "key_prefix",
+      "fieldtype": "Data",
+      "label": "Key Pattern",
+      "reqd": 1
+    },
+    {
+      "fieldname": "serving_section",
+      "fieldtype": "Section Break",
+      "label": "Serving"
+    },
+    {
+      "default": "3600",
+      "description": "Reserved for future use. Currently unused — all file serving goes through the backend proxy endpoint.",
+      "fieldname": "signed_url_expiry",
+      "fieldtype": "Int",
+      "label": "Signed URL Expiry"
+    },
+    {
+      "default": "1",
+      "description": "Delete the S3 object when a File doc is trashed.",
+      "fieldname": "delete_from_s3",
+      "fieldtype": "Check",
+      "label": "Delete from S3 on Trash"
+    },
+    {
+      "fieldname": "backup_section",
+      "fieldtype": "Section Break",
+      "label": "Backup & Restore"
+    },
+    {
+      "default": "1",
+      "description": "Stage S3 files locally during `bench backup --with-files` so the resulting tar is self-contained.",
+      "fieldname": "include_in_native_backup",
+      "fieldtype": "Check",
+      "label": "Include S3 Files in Native Backup"
+    },
+    {
+      "default": "0",
+      "description": "After `bench migrate` (which typically runs right after `bench restore`), automatically push local files back to S3.",
+      "fieldname": "auto_push_after_migrate",
+      "fieldtype": "Check",
+      "label": "Auto-Push Local Files after Migrate"
+    },
+    {
+      "default": "1",
+      "description": "Remove the local copy after uploading to S3.",
+      "fieldname": "delete_local_after_push",
+      "fieldtype": "Check",
+      "label": "Delete Local After Push"
+    },
+    {
+      "fieldname": "advanced_section",
+      "fieldtype": "Section Break",
+      "label": "Advanced"
+    },
+    {
+      "description": "Newline-separated doctype names whose File attachments should NOT go to S3.",
+      "fieldname": "ignored_doctypes",
+      "fieldtype": "Small Text",
+      "label": "Ignored Doctypes"
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "issingle": 1,
+  "links": [],
+  "modified": "2026-05-19 12:00:00",
+  "modified_by": "Administrator",
+  "module": "S3 Store",
+  "name": "S3 Store Settings",
+  "owner": "Administrator",
+  "permissions": [
+    {
+      "create": 1,
+      "delete": 1,
+      "email": 1,
+      "print": 1,
+      "read": 1,
+      "role": "System Manager",
+      "share": 1,
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}
