@@ -27,9 +27,7 @@ def s3_store_push_local(context, delete_local):
             delete_local = bool(settings.delete_local_after_push)
 
         if delete_local and sys.stdin.isatty():
-            click.confirm(
-                "Delete local files after uploading to S3?", abort=True
-            )
+            click.confirm("Delete local files after uploading to S3?", abort=True)
 
         result = push_local_files_to_s3(delete_local=delete_local)
         click.echo(
@@ -45,4 +43,4 @@ def s3_store_push_local(context, delete_local):
         frappe.destroy()
 
 
-s3_store_commands = [s3_store_push_local]
+commands = [s3_store_push_local]

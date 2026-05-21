@@ -1,4 +1,4 @@
-"""Whitelisted endpoints. `serve` resolves a key to a presigned redirect after
+"""Whitelisted endpoints. `serve` proxies S3 content through the backend after
 permission checks; `start_migration` enqueues a bulk local→S3 migration."""
 
 from __future__ import annotations
@@ -18,11 +18,12 @@ def serve(key: str):
 
     # Exact-match lookup against the URL we wrote in `write_file`. This avoids
     # LIKE wildcard injection and lets MySQL use an index on file_url.
-    from urllib.parse import quote
+    from urllib.parse import quote, unquote
 
     from .file_handler import SERVE_PATH
 
-    expected_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
+    raw_key = unquote(key)
+    expected_url = f"{SERVE_PATH}?key={quote(raw_key, safe='')}"
     file_name = frappe.db.get_value("File", {"file_url": expected_url}, "name")
 
     if not file_name:
@@ -35,15 +36,16 @@ def serve(key: str):
     if not settings.enabled:
         frappe.throw(_("S3 Store is not enabled"))
 
-    expiry = max(60, min(int(settings.signed_url_expiry or 3600), 604800))
-    url = s3_client.presigned_url(
-        key,
-        os.path.basename(file_doc.file_name or key),
-        expiry,
-        settings,
+    obj = s3_client.get_object(raw_key, settings)
+    frappe.local.response.update(
+        {
+            "type": "download",
+            "filename": os.path.basename(file_doc.file_name or raw_key),
+            "filecontent": obj["Body"].read(),
+            "content_type": obj.get("ContentType", "application/octet-stream"),
+            "display_content_as": "inline",
+        }
     )
-    frappe.local.response["type"] = "redirect"
-    frappe.local.response["location"] = url
 
 
 @frappe.whitelist()
@@ -56,7 +58,7 @@ def start_migration():
     frappe.enqueue(
         "s3_store.s3_store.migration.run",
         log_name=log.name,
-        queue="long",
+        queue="default",
         timeout=3600,
     )
     return {"log": log.name}

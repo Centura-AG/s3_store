@@ -10,4 +10,4 @@ delete_file_data_content = "s3_store.s3_store.file_handler.delete_file_data_cont
 
 after_migrate = ["s3_store.s3_store.migration.after_migrate_push_local"]
 
-commands = ["s3_store.s3_store.commands.s3_store_commands"]
+commands = ["s3_store.s3_store.commands"]

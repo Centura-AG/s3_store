@@ -16,13 +16,59 @@ from pathlib import Path
 import frappe
 from frappe import _
 from frappe.utils import get_files_path
-from frappe.utils.backups import BackupGenerator  # nosemgrep: frappe-monkey-patching-not-allowed
+from frappe.utils.backups import (
+    BackupGenerator,
+)  # nosemgrep: frappe-monkey-patching-not-allowed
 
 _PATCHED = False
 _ORIGINAL_BACKUP_FILES = None
 _ORIGINAL_GET_RECENT = None
+_RESTORE_PATCHED = False
 
 LOCK_FILENAME = ".s3_store_backup.lock"
+
+
+def patch_restore_push() -> None:
+    global _RESTORE_PATCHED
+    if _RESTORE_PATCHED:
+        return
+    import frappe.installer as _installer
+
+    _orig = _installer.extract_files
+
+    def _patched(site_name, file_path):
+        result = _orig(site_name, file_path)
+        _post_extract_push(site_name)
+        return result
+
+    _installer.extract_files = _patched
+    _RESTORE_PATCHED = True
+
+
+def _post_extract_push(site_name: str) -> None:
+    import frappe as _frappe
+
+    try:
+        _frappe.destroy()
+        _frappe.init(site_name)
+        _frappe.connect()
+        from .migration import _settings, push_local_files_to_s3
+
+        settings = _settings()
+        if not (settings and settings.auto_push_after_migrate):
+            return
+        result = push_local_files_to_s3(
+            delete_local=bool(settings.delete_local_after_push)
+        )
+        if result["pushed"] or result["failed"]:
+            print(
+                f"[s3_store] post-restore: pushed {result['pushed']}, failed {result['failed']}"
+            )
+    except Exception as exc:
+        print(f"[s3_store] post-restore push skipped: {exc}")
+    finally:
+        with contextlib.suppress(Exception):
+            _frappe.destroy()
 
 
 def patch_backup_generator() -> None:

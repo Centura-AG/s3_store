@@ -15,7 +15,6 @@
     "bucket",
     "key_prefix",
     "serving_section",
-    "public_file_mode",
     "signed_url_expiry",
     "delete_from_s3",
     "backup_section",
@@ -74,23 +73,17 @@
       "mandatory_depends_on": "eval:doc.enabled"
     },
     {
-      "description": "Optional key prefix, e.g. site name. Objects are stored at {prefix}/{YYYY/MM/DD}/{doctype}/{token}_{name}.",
+      "default": "{date}/{doctype}/{token}_{filename}",
+      "description": "Key template. Variables: {date} (YYYY/MM/DD), {doctype}, {token} (8-char hex), {filename}. A plain string without { is used as a prefix.",
       "fieldname": "key_prefix",
       "fieldtype": "Data",
-      "label": "Key Prefix"
+      "label": "Key Pattern",
+      "reqd": 1
     },
     {
       "fieldname": "serving_section",
       "fieldtype": "Section Break",
       "label": "Serving"
-    },
-    {
-      "default": "Presigned URL",
-      "description": "Presigned URL: app generates a time-limited redirect (private bucket OK). Public ACL: direct S3 URL (bucket must allow public reads).",
-      "fieldname": "public_file_mode",
-      "fieldtype": "Select",
-      "label": "Public File Mode",
-      "options": "Presigned URL\nPublic ACL"
     },
     {
       "default": "3600",

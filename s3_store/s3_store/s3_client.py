@@ -44,8 +44,6 @@ def upload(
     settings: "S3StoreSettings",
 ) -> None:
     extra = {"ContentType": content_type or "application/octet-stream"}
-    if not is_private and settings.public_file_mode == "Public ACL":
-        extra["ACL"] = "public-read"
     _client(settings).upload_fileobj(fileobj, settings.bucket, key, ExtraArgs=extra)
 
 
@@ -74,6 +72,10 @@ def presigned_url(
     )
 
 
+def get_object(key: str, settings: "S3StoreSettings") -> dict:
+    return _client(settings).get_object(Bucket=settings.bucket, Key=key)
+
+
 def public_url(key: str, settings: "S3StoreSettings") -> str:
     if settings.endpoint_url:
         base = settings.endpoint_url.rstrip("/")
@@ -92,8 +94,13 @@ def verify_connection(settings: "S3StoreSettings") -> None:
     _client(settings).head_bucket(Bucket=settings.bucket)
 
 
-def make_key(prefix: str, doctype: str, file_name: str) -> str:
-    """Build {prefix}/{YYYY/MM/DD}/{doctype}/{token8}_{sanitized}."""
+def make_key(pattern: str, doctype: str, file_name: str) -> str:
+    """Build an S3 key from a pattern template.
+
+    Variables: {date} YYYY/MM/DD, {doctype}, {token} 8-char hex, {filename}.
+    Default pattern: {date}/{doctype}/{token}_{filename}.
+    A pattern without '{' is treated as a plain prefix prepended to the default.
+    """
     import re
     import secrets
     from datetime import datetime, timezone
@@ -102,5 +109,16 @@ def make_key(prefix: str, doctype: str, file_name: str) -> str:
     sanitized = re.sub(r"[^\w.\-]", "_", file_name or "file")
     date_part = datetime.now(timezone.utc).strftime("%Y/%m/%d")
     dt_part = re.sub(r"[^\w\-]", "_", doctype or "Misc")
-    parts = [p for p in (prefix, date_part, dt_part, f"{token}_{sanitized}") if p]
-    return "/".join(parts).lstrip("/")
+
+    template = (
+        f"{pattern.rstrip('/')}/{{date}}/{{doctype}}/{{token}}_{{filename}}"
+        if pattern and "{" not in pattern
+        else (pattern or "{date}/{doctype}/{token}_{filename}")
+    )
+
+    return template.format(
+        date=date_part,
+        doctype=dt_part,
+        token=token,
+        filename=sanitized,
+    ).lstrip("/")

@@ -89,7 +89,7 @@
   "owner": "Administrator",
   "permissions": [
     {
-      "create": 1,
+      "create": 0,
       "delete": 0,
       "email": 0,
       "print": 1,

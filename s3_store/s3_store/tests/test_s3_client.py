@@ -14,7 +14,6 @@ def _settings(**over):
         aws_access_key_id="AKIA",
         bucket="test-bucket",
         key_prefix="site1",
-        public_file_mode="Presigned URL",
         signed_url_expiry=3600,
     )
     defaults.update(over)
@@ -38,24 +37,6 @@ class TestS3Client(FrappeTestCase):
             self.assertEqual(args[1], "test-bucket")
             self.assertEqual(args[2], "k")
             self.assertEqual(kwargs["ExtraArgs"]["ContentType"], "image/png")
-
-    def test_upload_sets_public_acl_when_public_mode_and_not_private(self):
-        settings = _settings(public_file_mode="Public ACL")
-        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
-            cl = MagicMock()
-            mboto.client.return_value = cl
-            s3_client.upload("k", BytesIO(b"x"), "image/png", False, settings)
-            self.assertEqual(
-                cl.upload_fileobj.call_args.kwargs["ExtraArgs"]["ACL"], "public-read"
-            )
-
-    def test_upload_omits_acl_for_private(self):
-        settings = _settings(public_file_mode="Public ACL")
-        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
-            cl = MagicMock()
-            mboto.client.return_value = cl
-            s3_client.upload("k", BytesIO(b"x"), "image/png", True, settings)
-            self.assertNotIn("ACL", cl.upload_fileobj.call_args.kwargs["ExtraArgs"])
 
     def test_delete_calls_delete_object(self):
         settings = _settings()

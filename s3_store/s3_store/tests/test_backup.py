@@ -151,7 +151,6 @@ class TestStageS3Files(FrappeTestCase):
             include_in_native_backup=1,
             bucket="b",
             key_prefix="p",
-            public_file_mode="Presigned URL",
             region="us-east-1",
             endpoint_url="",
             aws_access_key_id="AKIA",

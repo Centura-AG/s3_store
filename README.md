@@ -266,16 +266,38 @@ All boto3 calls are mocked — the suite never hits the network.
 ### End-to-end smoke test against MinIO
 
 ```bash
-# Start MinIO locally
-docker run -p 9000:9000 -p 9001:9001 \
-    -e MINIO_ROOT_USER=admin -e MINIO_ROOT_PASSWORD=adminadmin \
+# Remove any previous attempt before re-creating
+docker rm -f s3store-minio 2>/dev/null || true
+
+# Start MinIO (change ports if 9200/9201 are taken)
+docker run -d --name s3store-minio \
+    -p 9200:9000 -p 9201:9001 \
+    -e MINIO_ROOT_USER=admin \
+    -e MINIO_ROOT_PASSWORD=adminadmin \
     minio/minio server /data --console-address ":9001"
 
-# Configure s3_store with endpoint_url=http://localhost:9000, create bucket
-bench --site dev.s3.test install-app s3_store
-# (set credentials + bucket via Desk)
+# Create the bucket
+docker run --rm --network container:s3store-minio --entrypoint sh minio/mc \
+    -c "mc alias set local http://localhost:9000 admin adminadmin --api s3v4 \
+        && mc mb --ignore-existing local/s3store-bucket"
+```
 
-# Upload some files via the UI, then:
+Open **S3 Store Settings** in Desk:
+
+| Field                 | Value                   |
+| --------------------- | ----------------------- |
+| Enabled               | ✓                       |
+| Endpoint URL          | `http://localhost:9200` |
+| Region                | `us-east-1`             |
+| AWS Access Key ID     | `admin`                 |
+| AWS Secret Access Key | `adminadmin`            |
+| Bucket                | `s3store-bucket`        |
+
+Console is at `http://localhost:9201` (`admin` / `adminadmin`).
+
+```bash
+bench --site dev.s3.test install-app s3_store
+# upload some files via the UI, then:
 bench --site dev.s3.test backup --with-files
 
 # Wipe and restore
@@ -309,6 +331,8 @@ The File doc points at an S3 key, but no local copy was found at the expected st
 ---
 
 ## Limitations
+
+- **Disk space is required on the server for both backup and restore.** During backup, every S3-hosted file is downloaded to the server's local disk before `tar` runs; during restore, the tar is extracted to local disk before `bench s3-store-push-local` (or the auto-push hook) re-uploads everything. In both directions the server must have free disk space roughly equal to the total size of all S3-backed files. If that isn't possible, disable `include_in_native_backup` and manage S3 backups separately.
 
 - **`bench backup --exclude-doctypes File`** is incompatible: the DB dump won't reference the staged files. There's no clean way to detect this from the patch site.
 - **External `file_url` (e.g. Google Drive thumbnails)** is ignored by both the backup-staging path and the post-restore push — those URLs aren't under our control.

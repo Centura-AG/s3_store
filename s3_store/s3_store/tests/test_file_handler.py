@@ -28,7 +28,6 @@ def _settings_doc(**over):
         enabled=1,
         bucket="b",
         key_prefix="p",
-        public_file_mode="Presigned URL",
         delete_from_s3=1,
         region="us-east-1",
         endpoint_url="",
@@ -62,32 +61,6 @@ class TestFileHandler(FrappeTestCase):
             "/api/method/s3_store.s3_store.api.serve?key=", result["file_url"]
         )
         doc.save_file_on_filesystem.assert_not_called()
-
-    def test_public_acl_mode_uses_public_url(self):
-        doc = _fake_doc(is_private=0)
-        settings = _settings_doc(public_file_mode="Public ACL")
-        with (
-            patch.object(file_handler, "_get_settings", return_value=settings),
-            patch("s3_store.s3_store.s3_client.upload"),
-            patch(
-                "s3_store.s3_store.s3_client.public_url",
-                return_value="https://b.s3.amazonaws.com/x",
-            ),
-        ):
-            result = file_handler.write_file(doc)
-        self.assertEqual(result["file_url"], "https://b.s3.amazonaws.com/x")
-
-    def test_private_always_uses_serve_endpoint(self):
-        doc = _fake_doc(is_private=1)
-        settings = _settings_doc(public_file_mode="Public ACL")
-        with (
-            patch.object(file_handler, "_get_settings", return_value=settings),
-            patch("s3_store.s3_store.s3_client.upload"),
-        ):
-            result = file_handler.write_file(doc)
-        self.assertIn(
-            "/api/method/s3_store.s3_store.api.serve?key=", result["file_url"]
-        )
 
     def test_ignored_doctype_falls_back(self):
         doc = _fake_doc(attached_to_doctype="Ignored DT")

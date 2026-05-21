@@ -21,7 +21,7 @@ from .file_handler import SERVE_PATH
 
 def _settings():
     try:
-        settings = frappe.get_cached_doc("S3 Store Settings", "S3 Store Settings")
+        settings = frappe.get_doc("S3 Store Settings", "S3 Store Settings")
     except Exception:
         return None
     return settings if settings.enabled else None
@@ -66,10 +66,7 @@ def _upload_local_file(row, settings, delete_local: bool) -> tuple[bool, str | N
 
         s3_client.head(key, settings)
 
-        if row["is_private"] or settings.public_file_mode == "Presigned URL":
-            new_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
-        else:
-            new_url = s3_client.public_url(key, settings)
+        new_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
 
         frappe.db.set_value(
             "File", row["name"], "file_url", new_url, update_modified=False

@@ -12,7 +12,6 @@ from io import BytesIO
 from urllib.parse import quote, urlparse, parse_qs
 
 import frappe
-from frappe import _
 
 from . import s3_client
 from .doctype.s3_store_settings.s3_store_settings import S3StoreSettings
@@ -48,16 +47,13 @@ def write_file(doc):
         or "application/octet-stream"
     )
     key = s3_client.make_key(
-        settings.key_prefix or "", doc.attached_to_doctype or "Misc", doc.file_name
+        settings.key_prefix, doc.attached_to_doctype or "Misc", doc.file_name
     )
     is_private = bool(doc.is_private)
 
     s3_client.upload(key, BytesIO(doc._content), content_type, is_private, settings)
 
-    if is_private or settings.public_file_mode == "Presigned URL":
-        doc.file_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
-    else:
-        doc.file_url = s3_client.public_url(key, settings)
+    doc.file_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
 
     return {"file_name": doc.file_name, "file_url": doc.file_url}
 
