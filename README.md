@@ -195,55 +195,6 @@ Errors are collected per-file — one bad file doesn't abort the run. The log do
 
 ---
 
-## Architecture notes
-
-### Why monkey-patch `BackupGenerator`?
-
-Frappe core exposes **no** `before_backup`, `after_backup`, or `after_restore` hooks. `BackupGenerator.backup_files()` shells out `tar cf` against `public/files` and `private/files` ([backups.py:349](https://github.com/frappe/frappe/blob/develop/frappe/utils/backups.py#L349)); `extract_files()` shells out `tar xvf --strip 2` ([installer.py:757](https://github.com/frappe/frappe/blob/develop/frappe/installer.py#L757)). Neither calls into app code.
-
-`scheduled_backup()` instantiates `BackupGenerator` directly with no injection point, so a custom command wouldn't capture cron-triggered backups. The only way to make `bench backup --with-files` "just work" is to wrap `BackupGenerator.backup_files` from inside the app's `__init__.py`, which Frappe imports during `frappe.init()` — well before any backup runs.
-
-The patch:
-
-- Saves the original method via `_ORIGINAL_BACKUP_FILES` so future patches can chain.
-- Is idempotent (`_PATCHED` flag).
-- Falls back to the original when `_s3_enabled_for_current_site()` returns False — so sites without the app installed, sites with `enabled=0`, and sites in mid-bootstrap (`DoesNotExistError`/`OperationalError`) are unaffected.
-
-### Staging path
-
-Backup staging writes each S3 file to `public/files/{key_basename}` or `private/files/{key_basename}`. The basename comes from `make_key()` and carries an 8-char hex token, so two uploads with the same user-visible `file_name` always stage to distinct paths. Both `backup._stage_s3_files()` and `migration._push_existing_key()` agree on this layout — the same function (`backup.local_staging_path`) is the single source of truth.
-
-### Serve lookup
-
-`api.serve(key)` does an **exact-match** `frappe.db.get_value("File", {"file_url": <encoded URL>}, "name")` — not a LIKE scan. This:
-
-- Lets MySQL use any index on `file_url`.
-- Avoids LIKE-wildcard interpolation issues if a key contained `%` or `_`.
-- Is bounded O(1) instead of O(N) in the File table size.
-
-### Module layout
-
-```
-s3_store/
-├── __init__.py                 # installs backup patch as a side effect
-├── hooks.py                    # write_file, delete_file_data_content,
-│                               # after_migrate, commands
-└── s3_store/
-    ├── s3_client.py            # pure-function boto3 wrapper
-    ├── file_handler.py         # write_file + delete hook implementations
-    ├── api.py                  # serve(key), start_migration
-    ├── migration.py            # bulk migrator + post-restore push
-    ├── backup.py               # monkey-patch + staging logic
-    ├── commands.py             # bench s3-store-push-local
-    └── doctype/
-        ├── s3_store_settings/
-        └── s3_migration_log/
-```
-
-`s3_client.py` is pure functions taking `settings` as the last argument — trivially mockable, stateless at the module level.
-
----
-
 ## Testing
 
 ```bash
