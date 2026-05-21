@@ -19,24 +19,8 @@ from .doctype.s3_store_settings.s3_store_settings import S3StoreSettings
 
 SERVE_PATH = "/api/method/s3_store.s3_store.api.serve"
 
-# Types that browsers execute — never upload with these as ContentType.
-_BLOCKED_CONTENT_TYPES = frozenset(
-    {
-        "text/html",
-        "text/javascript",
-        "application/javascript",
-        "application/x-javascript",
-        "application/xhtml+xml",
-        "application/x-httpd-php",
-        "text/x-php",
-    }
-)
-
 
 def _safe_content_type(ct: str | None) -> str:
-    base = (ct or "").split(";")[0].strip().lower()
-    if base in _BLOCKED_CONTENT_TYPES:
-        return "application/octet-stream"
     return ct or "application/octet-stream"
 
 
