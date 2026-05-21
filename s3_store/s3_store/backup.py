@@ -77,12 +77,8 @@ def patch_backup_generator() -> None:
         return
     _ORIGINAL_BACKUP_FILES = BackupGenerator.backup_files
     _ORIGINAL_GET_RECENT = BackupGenerator.get_recent_backup
-    BackupGenerator.backup_files = (  # nosemgrep: frappe-monkey-patching-not-allowed
-        _patched_backup_files
-    )
-    BackupGenerator.get_recent_backup = (  # nosemgrep: frappe-monkey-patching-not-allowed
-        _patched_get_recent_backup
-    )
+    BackupGenerator.backup_files = _patched_backup_files  # nosemgrep: frappe-monkey-patching-not-allowed  # fmt: skip
+    BackupGenerator.get_recent_backup = _patched_get_recent_backup  # nosemgrep: frappe-monkey-patching-not-allowed  # fmt: skip
     _PATCHED = True
 
 
