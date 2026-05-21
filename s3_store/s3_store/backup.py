@@ -16,9 +16,9 @@ from pathlib import Path
 import frappe
 from frappe import _
 from frappe.utils import get_files_path
-from frappe.utils.backups import (
+from frappe.utils.backups import (  # nosemgrep: frappe-monkey-patching-not-allowed
     BackupGenerator,
-)  # nosemgrep: frappe-monkey-patching-not-allowed
+)
 
 _PATCHED = False
 _ORIGINAL_BACKUP_FILES = None
