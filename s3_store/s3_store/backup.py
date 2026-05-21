@@ -41,7 +41,7 @@ def patch_restore_push() -> None:
         _post_extract_push(site_name)
         return result
 
-    _installer.extract_files = _patched
+    _installer.extract_files = _patched  # nosemgrep: frappe-monkey-patching-not-allowed
     _RESTORE_PATCHED = True
 
 
@@ -77,8 +77,8 @@ def patch_backup_generator() -> None:
         return
     _ORIGINAL_BACKUP_FILES = BackupGenerator.backup_files
     _ORIGINAL_GET_RECENT = BackupGenerator.get_recent_backup
-    BackupGenerator.backup_files = _patched_backup_files
-    BackupGenerator.get_recent_backup = _patched_get_recent_backup
+    BackupGenerator.backup_files = _patched_backup_files  # nosemgrep: frappe-monkey-patching-not-allowed
+    BackupGenerator.get_recent_backup = _patched_get_recent_backup  # nosemgrep: frappe-monkey-patching-not-allowed
     _PATCHED = True
 
 
