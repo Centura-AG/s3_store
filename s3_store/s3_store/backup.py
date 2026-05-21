@@ -16,7 +16,7 @@ from pathlib import Path
 import frappe
 from frappe import _
 from frappe.utils import get_files_path
-from frappe.utils.backups import BackupGenerator
+from frappe.utils.backups import BackupGenerator  # nosemgrep: frappe-monkey-patching-not-allowed
 
 _PATCHED = False
 _ORIGINAL_BACKUP_FILES = None
@@ -31,8 +31,8 @@ def patch_backup_generator() -> None:
         return
     _ORIGINAL_BACKUP_FILES = BackupGenerator.backup_files
     _ORIGINAL_GET_RECENT = BackupGenerator.get_recent_backup
-    BackupGenerator.backup_files = _patched_backup_files  # nosemgrep: frappe-semgrep-rules.rules.frappe-monkey-patching-not-allowed
-    BackupGenerator.get_recent_backup = _patched_get_recent_backup  # nosemgrep: frappe-semgrep-rules.rules.frappe-monkey-patching-not-allowed
+    BackupGenerator.backup_files = _patched_backup_files
+    BackupGenerator.get_recent_backup = _patched_get_recent_backup
     _PATCHED = True
 
 
@@ -155,10 +155,11 @@ def _preflight_disk_space(settings) -> None:
     usage = shutil.disk_usage(frappe.get_site_path())
     if usage.free < required:
         frappe.throw(
-            f"Insufficient disk space to stage S3 files for backup: "
-            f"need {required} bytes, have {usage.free} bytes free under "
-            f"{frappe.get_site_path()}. Free up space or disable "
-            f"include_in_native_backup in S3 Store Settings."
+            _(
+                "Insufficient disk space to stage S3 files for backup: "
+                "need {0} bytes, have {1} bytes free under {2}. Free up space or disable "
+                "include_in_native_backup in S3 Store Settings."
+            ).format(required, usage.free, frappe.get_site_path())
         )
 
 
@@ -168,7 +169,7 @@ def _acquire_lock(lock_path: Path):
     import fcntl
 
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fh = open(lock_path, "w")  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
+    fh = open(lock_path, "w")  # nosemgrep: frappe-security-file-traversal
     try:
         fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError as e:

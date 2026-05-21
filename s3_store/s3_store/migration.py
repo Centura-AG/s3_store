@@ -61,7 +61,7 @@ def _upload_local_file(row, settings, delete_local: bool) -> tuple[bool, str | N
             mimetypes.guess_type(row["file_name"] or local_path)[0]
             or "application/octet-stream"
         )
-        with open(local_path, "rb") as fh:  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
+        with open(local_path, "rb") as fh:  # nosemgrep: frappe-security-file-traversal
             s3_client.upload(key, fh, content_type, bool(row["is_private"]), settings)
 
         s3_client.head(key, settings)
@@ -92,7 +92,7 @@ def run(log_name: str):
     log.status = "Running"
     log.started_at = now_datetime()
     log.save(ignore_permissions=True)
-    frappe.db.commit()  # Commit running status before long job starts  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+    frappe.db.commit()  # Commit running status before long job starts  # nosemgrep: frappe-manual-commit
 
     settings = _settings()
     if not settings:
@@ -100,13 +100,13 @@ def run(log_name: str):
         log.errors = "S3 Store is not enabled"
         log.completed_at = now_datetime()
         log.save(ignore_permissions=True)
-        frappe.db.commit()  # Commit failure status when settings are disabled  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+        frappe.db.commit()  # Commit failure status when settings are disabled  # nosemgrep: frappe-manual-commit
         return
 
     rows = _iter_local_files()
     log.total_files = len(rows)
     log.save(ignore_permissions=True)
-    frappe.db.commit()  # Commit total count before processing files  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+    frappe.db.commit()  # Commit total count before processing files  # nosemgrep: frappe-manual-commit
 
     errors: list[str] = []
     migrated = 0
@@ -141,7 +141,7 @@ def run(log_name: str):
             frappe.db.set_value(
                 "S3 Migration Log", log_name, "failed", failed, update_modified=False
             )
-            frappe.db.commit()  # Periodic commit so migration progress is visible  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+            frappe.db.commit()  # Periodic commit so migration progress is visible  # nosemgrep: frappe-manual-commit
 
     log = frappe.get_doc("S3 Migration Log", log_name)
     log.migrated = migrated
@@ -153,7 +153,7 @@ def run(log_name: str):
     log.completed_at = now_datetime()
     log.status = "Failed" if (failed and migrated == 0) else "Completed"
     log.save(ignore_permissions=True)
-    frappe.db.commit()  # Commit final migration results  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+    frappe.db.commit()  # Commit final migration results  # nosemgrep: frappe-manual-commit
 
 
 def _push_existing_key(row, key: str, settings) -> tuple[bool, str | None]:
@@ -172,7 +172,7 @@ def _push_existing_key(row, key: str, settings) -> tuple[bool, str | None]:
             mimetypes.guess_type(row["file_name"] or local_path)[0]
             or "application/octet-stream"
         )
-        with open(local_path, "rb") as fh:  # nosemgrep: frappe-semgrep-rules.rules.security.frappe-security-file-traversal
+        with open(local_path, "rb") as fh:  # nosemgrep: frappe-security-file-traversal
             s3_client.upload(key, fh, content_type, bool(row["is_private"]), settings)
         with contextlib.suppress(FileNotFoundError):
             os.unlink(local_path)
@@ -231,7 +231,7 @@ def push_local_files_to_s3(delete_local: bool = True) -> dict:
             if err:
                 errors.append(err)
 
-    frappe.db.commit()  # Commit rewritten file_url values after bulk push  # nosemgrep: frappe-semgrep-rules.rules.frappe-manual-commit
+    frappe.db.commit()  # Commit rewritten file_url values after bulk push  # nosemgrep: frappe-manual-commit
     return {"pushed": pushed, "failed": failed, "errors": errors}
 
 
