@@ -3,7 +3,6 @@ argument so they're trivially mockable in tests and stateless at the module leve
 
 from __future__ import annotations
 
-import contextlib
 import functools
 import logging
 from typing import TYPE_CHECKING, BinaryIO
@@ -95,8 +94,7 @@ def verify_connection(settings: "S3StoreSettings") -> None:
     # Probe write + delete to catch missing PutObject/DeleteObject IAM permissions.
     probe_key = f".s3_store_probe_{secrets.token_hex(8)}"
     client.put_object(Bucket=settings.bucket, Key=probe_key, Body=b"")
-    with contextlib.suppress(Exception):
-        client.delete_object(Bucket=settings.bucket, Key=probe_key)
+    client.delete_object(Bucket=settings.bucket, Key=probe_key)
 
 
 def make_key(pattern: str, doctype: str, file_name: str) -> str:

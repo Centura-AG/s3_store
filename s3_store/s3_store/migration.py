@@ -16,7 +16,7 @@ from frappe import _
 from frappe.utils import get_files_path, now_datetime
 
 from . import s3_client
-from .file_handler import SERVE_PATH
+from .file_handler import SERVE_PATH, _safe_content_type
 
 
 def _settings():
@@ -64,14 +64,11 @@ def _upload_local_file(row, settings, delete_local: bool) -> tuple[bool, str | N
             row.get("attached_to_doctype") or "Misc",
             row["file_name"] or os.path.basename(local_path),
         )
-        content_type = (
+        content_type = _safe_content_type(
             mimetypes.guess_type(row["file_name"] or local_path)[0]
-            or "application/octet-stream"
         )
         with open(local_path, "rb") as fh:  # nosemgrep: frappe-security-file-traversal
             s3_client.upload(key, fh, content_type, bool(row["is_private"]), settings)
-
-        s3_client.head(key, settings)
 
         new_url = f"{SERVE_PATH}?key={quote(key, safe='')}"
 
@@ -156,7 +153,12 @@ def run(log_name: str):
         capped.append(f"... and {len(errors) - 500} more")
     log.errors = "\n".join(capped) if capped else None
     log.completed_at = now_datetime()
-    log.status = "Failed" if (failed and migrated == 0) else "Completed"
+    if failed == 0:
+        log.status = "Completed"
+    elif migrated == 0:
+        log.status = "Failed"
+    else:
+        log.status = "Completed with errors"
     log.save(ignore_permissions=True)
     frappe.db.commit()  # Commit final migration results  # nosemgrep: frappe-manual-commit
 
@@ -173,9 +175,8 @@ def _push_existing_key(row, key: str, settings) -> tuple[bool, str | None]:
     if not os.path.exists(local_path):
         return False, f"staged file missing for {row['name']}: {local_path}"
     try:
-        content_type = (
+        content_type = _safe_content_type(
             mimetypes.guess_type(row["file_name"] or local_path)[0]
-            or "application/octet-stream"
         )
         with open(local_path, "rb") as fh:  # nosemgrep: frappe-security-file-traversal
             s3_client.upload(key, fh, content_type, bool(row["is_private"]), settings)

@@ -163,9 +163,10 @@ def _stage_s3_files():
     lock_handle = _acquire_lock(lock_path)
     try:
         settings = frappe.get_cached_doc("S3 Store Settings", "S3 Store Settings")
-        _preflight_disk_space(settings)
+        file_rows = _iter_s3_file_rows(settings)
+        _preflight_disk_space(file_rows)
 
-        for row, key in _iter_s3_file_rows(settings):
+        for row, key in file_rows:
             local_path = Path(local_staging_path(key, bool(row["is_private"])))
             if local_path in staged_paths:
                 frappe.log_error(
@@ -205,9 +206,9 @@ def _stage_s3_files():
         _release_lock(lock_handle, lock_path)
 
 
-def _preflight_disk_space(settings: object) -> None:
+def _preflight_disk_space(file_rows: list) -> None:
     """Abort early if there isn't ~110% of S3 content size free locally."""
-    total = sum(row["file_size"] or 0 for row, _ in _iter_s3_file_rows(settings))
+    total = sum(row["file_size"] or 0 for row, _ in file_rows)
     if not total:
         return
     required = int(total * 1.1)
@@ -244,6 +245,8 @@ def _release_lock(fh, lock_path: Path) -> None:
         return
     # Unlink before closing: new openers get a fresh inode so they can't
     # race to acquire the lock on the same file we're about to release.
-    with contextlib.suppress(FileNotFoundError):
-        lock_path.unlink()
-    fh.close()
+    try:
+        with contextlib.suppress(FileNotFoundError):
+            lock_path.unlink()
+    finally:
+        fh.close()

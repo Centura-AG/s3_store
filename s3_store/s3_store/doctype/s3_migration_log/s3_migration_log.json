@@ -23,7 +23,7 @@
       "fieldtype": "Select",
       "in_list_view": 1,
       "label": "Status",
-      "options": "Queued\nRunning\nCompleted\nFailed",
+      "options": "Queued\nRunning\nCompleted\nCompleted with errors\nFailed",
       "read_only": 1
     },
     {
