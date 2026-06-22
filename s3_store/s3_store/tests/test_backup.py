@@ -80,7 +80,7 @@ class TestIterS3FileRows(FrappeTestCase):
         defaults.update(over)
         return SimpleNamespace(**defaults)
 
-    def test_picks_up_presigned_serve_urls(self):
+    def test_picks_up_serve_urls(self):
         row = {
             "name": "F1",
             "file_url": "/api/method/s3_store.s3_store.api.serve?key=p/2026/k.txt",

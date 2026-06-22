@@ -66,9 +66,8 @@ When `Enabled = 1`, every new File doc routes through the `write_file` hook:
 
 1. The file's bytes are uploaded to S3 under a generated key:
    `{key_prefix}/{YYYY/MM/DD}/{attached_to_doctype}/{token8}_{sanitized_name}`
-2. The File doc's `file_url` is rewritten to one of:
-   - **Presigned URL mode** (default): `/api/method/s3_store.s3_store.api.serve?key=<encoded>`
-   - **Public ACL mode**: a direct S3 URL (bucket must allow public reads)
+2. The File doc's `file_url` is rewritten to the backend serve endpoint:
+   `/api/method/s3_store.s3_store.api.serve?key=<encoded>`
 3. No local copy is kept.
 
 The `token8` is a random 4-byte hex prefix — uploads of the same `file.pdf` from different forms get distinct keys, so they can't overwrite each other in S3 or on disk during backup staging.
@@ -79,17 +78,11 @@ The `token8` is a random 4-byte hex prefix — uploads of the same `file.pdf` fr
 
 ## How serving works
 
-### Presigned URL mode (default)
+`/api/method/s3_store.s3_store.api.serve?key=<encoded>` resolves the key to a File doc via an exact-match lookup on `file_url`, enforces `check_permission("read")` on that doc, then **streams the object's bytes through the backend** as a download response (`display_content_as: inline`).
 
-`/api/method/s3_store.s3_store.api.serve?key=<encoded>` resolves the key to a File doc, checks `has_permission` if the file is private, then 302-redirects to a short-lived presigned URL. Expiry is configurable (`signed_url_expiry`, default 3600s).
+The S3 object is fetched server-side with `get_object` and proxied to the client — the bucket stays **fully private** and credentials never leave the server. Browsers never talk to S3 directly.
 
-Works with **private buckets** — credentials never leave the server.
-
-### Public ACL mode
-
-Files are written with `ACL: public-read` and the `file_url` is the direct S3 URL. Browsers fetch them straight from S3, bypassing the app. Use this if you need maximum performance for public-facing content and you're comfortable making the bucket world-readable.
-
-Private files always use the presigned-URL path regardless of mode.
+> Because every read is proxied through a web worker, large files occupy a worker for the duration of the download and are buffered in memory. For very large public assets you may prefer fronting the bucket with a CDN; that is out of scope for this app.
 
 ---
 
@@ -167,7 +160,7 @@ For every File row with a `/files/...` or `/private/files/...` URL, `s3_store`:
 
 1. Mints a fresh S3 key
 2. Uploads the bytes
-3. Rewrites `file_url` to the serve endpoint (or public URL)
+3. Rewrites `file_url` to the backend serve endpoint
 4. Deletes the local copy (subject to `delete_local_after_push`)
 
 Errors are collected per-file — one bad file doesn't abort the run. The log doc shows status, counts, and the per-file error list.
@@ -176,22 +169,21 @@ Errors are collected per-file — one bad file doesn't abort the run. The log do
 
 ## Settings reference
 
-| Field                      | Default         | Description                                                                                                                               |
-| -------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`                  | `0`             | Master switch. When off, files go to the local filesystem as usual.                                                                       |
-| `endpoint_url`             | —               | S3 endpoint. Blank for AWS; set for MinIO etc.                                                                                            |
-| `region`                   | `us-east-1`     | AWS region.                                                                                                                               |
-| `aws_access_key_id`        | —               | Required when enabled.                                                                                                                    |
-| `aws_secret_access_key`    | —               | Required when enabled (stored encrypted via Frappe's password field).                                                                     |
-| `bucket`                   | —               | Required when enabled.                                                                                                                    |
-| `key_prefix`               | —               | Optional path prefix (e.g. site name). Objects are stored at `{prefix}/{YYYY/MM/DD}/{doctype}/{token}_{name}`.                            |
-| `public_file_mode`         | `Presigned URL` | `Presigned URL`: app generates a time-limited redirect (private bucket OK). `Public ACL`: direct S3 URL (bucket must allow public reads). |
-| `signed_url_expiry`        | `3600`          | Presigned URL expiry in seconds.                                                                                                          |
-| `delete_from_s3`           | `1`             | Delete the S3 object when a File doc is trashed.                                                                                          |
-| `include_in_native_backup` | `1`             | Stage S3 files locally during `bench backup --with-files`.                                                                                |
-| `auto_push_after_migrate`  | `0`             | After `bench migrate` (typically right after `bench restore`), push local files back to S3.                                               |
-| `delete_local_after_push`  | `1`             | Remove the local copy after uploading to S3.                                                                                              |
-| `ignored_doctypes`         | —               | Newline-separated DocType names whose attachments stay on the local filesystem.                                                           |
+| Field                      | Default     | Description                                                                                                    |
+| -------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
+| `enabled`                  | `0`         | Master switch. When off, files go to the local filesystem as usual.                                            |
+| `endpoint_url`             | —           | S3 endpoint. Blank for AWS; set for MinIO etc.                                                                 |
+| `region`                   | `us-east-1` | AWS region.                                                                                                    |
+| `aws_access_key_id`        | —           | Required when enabled.                                                                                         |
+| `aws_secret_access_key`    | —           | Required when enabled (stored encrypted via Frappe's password field).                                          |
+| `bucket`                   | —           | Required when enabled.                                                                                         |
+| `key_prefix`               | —           | Optional path prefix (e.g. site name). Objects are stored at `{prefix}/{YYYY/MM/DD}/{doctype}/{token}_{name}`. |
+| `signed_url_expiry`        | `3600`      | Reserved for future use. Currently unused — all serving goes through the backend proxy endpoint.               |
+| `delete_from_s3`           | `1`         | Delete the S3 object when a File doc is trashed.                                                               |
+| `include_in_native_backup` | `1`         | Stage S3 files locally during `bench backup --with-files`.                                                     |
+| `auto_push_after_migrate`  | `0`         | After `bench migrate` (typically right after `bench restore`), push local files back to S3.                    |
+| `delete_local_after_push`  | `1`         | Remove the local copy after uploading to S3.                                                                   |
+| `ignored_doctypes`         | —           | Newline-separated DocType names whose attachments stay on the local filesystem.                                |
 
 ---
 
@@ -205,12 +197,12 @@ The suite covers:
 
 - Settings validation (creds + connection check)
 - `write_file` and delete-on-trash hook
-- `serve` redirect, missing-key, permission-error paths
+- `serve` content proxying, missing-key, permission-error paths
 - Bulk migration: rewrite URL, delete local, error collection, log doc lifecycle
 - Post-restore push: re-upload to existing key, error when staged file is missing
 - Backup staging: cleanup on success, cleanup on exception, mixed-mode skip
 - Patched `BackupGenerator` is a no-op when S3 disabled; `get_recent_backup` neutralises file tars
-- URL parsing across virtual-host AWS, path-style MinIO, and the presigned serve endpoint
+- URL parsing across virtual-host AWS, path-style MinIO, and the backend serve endpoint
 
 All boto3 calls are mocked — the suite never hits the network.
 

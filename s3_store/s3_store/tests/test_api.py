@@ -18,40 +18,49 @@ class TestServe(FrappeTestCase):
         ):
             api.serve("nokey")
 
-    def test_valid_public_key_redirects(self):
+    def test_valid_public_key_proxies_content(self):
         fake_doc = MagicMock()
         fake_doc.is_private = 0
         fake_doc.file_name = "x.png"
+
+        body = MagicMock()
+        body.read.return_value = b"filebytes"
 
         with (
             patch.object(frappe.db, "get_value", return_value="FILE-1"),
             patch.object(frappe, "get_doc", return_value=fake_doc),
             patch.object(frappe, "get_cached_doc") as gcd,
             patch(
-                "s3_store.s3_store.s3_client.presigned_url",
-                return_value="https://signed",
+                "s3_store.s3_store.s3_client.get_object",
+                return_value={"Body": body, "ContentType": "image/png"},
             ),
         ):
-            gcd.return_value = MagicMock(enabled=1, signed_url_expiry=3600)
+            gcd.return_value = MagicMock(enabled=1)
             frappe.local.response = {}
             api.serve("somekey")
-            self.assertEqual(frappe.local.response["type"], "redirect")
-            self.assertEqual(frappe.local.response["location"], "https://signed")
+            self.assertEqual(frappe.local.response["type"], "download")
+            self.assertEqual(frappe.local.response["filecontent"], b"filebytes")
+            self.assertEqual(frappe.local.response["content_type"], "image/png")
+            self.assertEqual(frappe.local.response["filename"], "x.png")
+        # The streamed body must be closed once it has been read.
+        body.close.assert_called_once()
 
     def test_lookup_uses_exact_match_with_encoded_key(self):
         # Regression: previously this did a LIKE '%key=KEY%' scan. Now it
         # builds the full encoded URL and asks for an exact match.
         fake_doc = MagicMock(is_private=0, file_name="x.png")
+        body = MagicMock()
+        body.read.return_value = b""
         with (
             patch.object(frappe.db, "get_value", return_value="FILE-1") as gv,
             patch.object(frappe, "get_doc", return_value=fake_doc),
             patch.object(frappe, "get_cached_doc") as gcd,
             patch(
-                "s3_store.s3_store.s3_client.presigned_url",
-                return_value="https://signed",
+                "s3_store.s3_store.s3_client.get_object",
+                return_value={"Body": body, "ContentType": "text/plain"},
             ),
         ):
-            gcd.return_value = MagicMock(enabled=1, signed_url_expiry=3600)
+            gcd.return_value = MagicMock(enabled=1)
             frappe.local.response = {}
             api.serve("p/2026/k.txt")
         # The filter must be an exact-match dict, not a LIKE clause, and the

@@ -82,7 +82,7 @@ def delete_file_data_content(doc, only_thumbnail: bool = False):
 def extract_key_from_url(file_url: str | None) -> str | None:
     """Recover the S3 key from a file_url string we previously wrote.
 
-    Recognises only URLs we could plausibly have produced — presigned serve
+    Recognises only URLs we could plausibly have produced — proxy serve
     URLs, virtual-host AWS URLs whose subdomain matches our bucket, and
     path-style URLs hosted at our configured endpoint. Foreign HTTPS URLs
     (e.g. Google Drive thumbnails) return None.

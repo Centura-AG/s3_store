@@ -46,17 +46,18 @@ class TestS3Client(FrappeTestCase):
             s3_client.delete("k", settings)
             cl.delete_object.assert_called_once_with(Bucket="test-bucket", Key="k")
 
-    def test_presigned_url_passes_expiry(self):
+    def test_get_object_calls_boto3(self):
         settings = _settings()
         with patch("s3_store.s3_store.s3_client.boto3") as mboto:
             cl = MagicMock()
-            cl.generate_presigned_url.return_value = "https://signed"
+            cl.get_object.return_value = {
+                "Body": MagicMock(),
+                "ContentType": "image/png",
+            }
             mboto.client.return_value = cl
-            url = s3_client.presigned_url("k", "file.png", 600, settings)
-            self.assertEqual(url, "https://signed")
-            self.assertEqual(
-                cl.generate_presigned_url.call_args.kwargs["ExpiresIn"], 600
-            )
+            obj = s3_client.get_object("k", settings)
+            cl.get_object.assert_called_once_with(Bucket="test-bucket", Key="k")
+            self.assertEqual(obj["ContentType"], "image/png")
 
     def test_verify_connection_calls_head_bucket(self):
         settings = _settings()
@@ -90,17 +91,3 @@ class TestS3Client(FrappeTestCase):
         settings = _settings(endpoint_url="https://minio.example.com")
         url = s3_client.public_url("a/b.png", settings)
         self.assertEqual(url, "https://minio.example.com/test-bucket/a/b.png")
-
-    def test_presigned_url_encodes_dangerous_filename(self):
-        settings = _settings()
-        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
-            cl = MagicMock()
-            cl.generate_presigned_url.return_value = "https://signed"
-            mboto.client.return_value = cl
-            s3_client.presigned_url("k", 'evil"name\r\nX-Inject: header', 600, settings)
-        params = cl.generate_presigned_url.call_args.kwargs["Params"]
-        cd = params["ResponseContentDisposition"]
-        self.assertNotIn('"', cd)
-        self.assertNotIn("\r", cd)
-        self.assertNotIn("\n", cd)
-        self.assertIn("filename*=UTF-8''", cd)
