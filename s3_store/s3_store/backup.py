@@ -112,7 +112,7 @@ def _s3_enabled_for_current_site() -> bool:
 def _iter_s3_file_rows(settings: object) -> list[tuple[dict, str]]:
     """All File rows whose URL resolves to an S3 key under our bucket.
 
-    Pulls both presigned-serve URLs and any HTTP(S) URLs (which `extract_key_from_url`
+    Pulls both proxy-serve URLs and any HTTP(S) URLs (which `extract_key_from_url`
     will reject if they don't belong to our bucket). Filtering in Python keeps the
     SQL simple and works for both virtual-host AWS URLs (bucket in subdomain) and
     path-style MinIO URLs (bucket in path)."""
