@@ -43,13 +43,14 @@ def _local_path_for(file_url: str, is_private: bool) -> str:
 
 
 def _iter_local_files():
-    rows = frappe.db.sql(
-        """
-		SELECT name, file_url, file_name, is_private, attached_to_doctype
-		FROM `tabFile`
-		WHERE file_url LIKE '/files/%' OR file_url LIKE '/private/files/%'
-		""",
-        as_dict=True,
+    rows = frappe.get_all(
+        "File",
+        or_filters=[
+            ["file_url", "like", "/files/%"],
+            ["file_url", "like", "/private/files/%"],
+        ],
+        fields=["name", "file_url", "file_name", "is_private", "attached_to_doctype"],
+        limit=0,
     )
     return rows
 
