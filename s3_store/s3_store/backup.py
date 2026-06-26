@@ -118,16 +118,15 @@ def _iter_s3_file_rows(settings: object) -> list[tuple[dict, str]]:
     path-style MinIO URLs (bucket in path)."""
     from .file_handler import extract_key_from_url
 
-    rows = frappe.db.sql(
-        """
-        SELECT name, file_url, file_name, file_size, is_private
-        FROM `tabFile`
-        WHERE file_url LIKE %(serve)s
-           OR file_url LIKE 'http://%%'
-           OR file_url LIKE 'https://%%'
-        """,
-        {"serve": "%/api/method/s3_store.s3_store.api.serve%"},
-        as_dict=True,
+    rows = frappe.get_all(
+        "File",
+        or_filters=[
+            ["file_url", "like", "%/api/method/s3_store.s3_store.api.serve%"],
+            ["file_url", "like", "http://%"],
+            ["file_url", "like", "https://%"],
+        ],
+        fields=["name", "file_url", "file_name", "file_size", "is_private"],
+        limit=0,
     )
     out: list[tuple[dict, str]] = []
     for row in rows:
@@ -150,7 +149,8 @@ def local_staging_path(key: str, is_private: bool) -> str:
 @contextlib.contextmanager
 def _stage_s3_files():
     """Download all S3-hosted files for this site into public/files and private/files,
-    yield, then remove only the files we staged. Guarantees cleanup even on tar failure."""
+    yield, then remove only the files we staged. Guarantees cleanup even on tar failure.
+    """
     from . import s3_client
 
     staged: list[Path] = []
