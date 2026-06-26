@@ -10,10 +10,9 @@ from s3_store.s3_store import migration
 
 class TestMigrationUpload(FrappeTestCase):
     def _make_local_file(self, content=b"data"):
-        """Create a file on disk + a stub File row dict pointing at it. Does NOT
-        insert via Frappe (which would rewrite the file_url with a hash suffix
-        and copy the bytes elsewhere). Direct DB insert via frappe.db.sql keeps
-        the URL stable so the migrator can find it."""
+        """Create a file on disk + a stub File row pointing at it.
+        Uses copy_from_existing_file flag to skip Frappe's file processing
+        (which would rewrite file_url) so the migrator can find it at the local path."""
         from frappe.utils import get_files_path
 
         base = get_files_path(is_private=0)
@@ -23,14 +22,20 @@ class TestMigrationUpload(FrappeTestCase):
         with open(path, "wb") as fh:
             fh.write(content)
         name = frappe.generate_hash(length=10)
-        frappe.db.sql(
-            """
-            INSERT INTO `tabFile` (name, file_name, file_url, is_private, attached_to_doctype, owner, creation, modified, modified_by)
-            VALUES (%s, %s, %s, 0, 'User', 'Administrator', NOW(), NOW(), 'Administrator')
-            """,
-            (name, basename, f"/files/{basename}"),
+        doc = frappe.get_doc(
+            {
+                "doctype": "File",
+                "name": name,
+                "file_name": basename,
+                "file_url": f"/files/{basename}",
+                "is_private": 0,
+                "attached_to_doctype": "User",
+                "owner": "Administrator",
+            }
         )
-        return path, name, basename
+        doc.flags.copy_from_existing_file = True
+        doc.insert(ignore_permissions=True)
+        return path, doc.name, basename
 
     def _settings(self):
         s = SimpleNamespace(
@@ -66,7 +71,7 @@ class TestMigrationUpload(FrappeTestCase):
             new_url = frappe.db.get_value("File", name, "file_url")
             self.assertIn("/api/method/s3_store.s3_store.api.serve?key=", new_url)
         finally:
-            frappe.db.sql("DELETE FROM `tabFile` WHERE name = %s", (name,))
+            frappe.db.delete("File", {"name": name})
             if os.path.exists(path):
                 os.unlink(path)
 
