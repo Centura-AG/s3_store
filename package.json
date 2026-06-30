@@ -9,6 +9,6 @@
   "author": "Centura AG",
   "dependencies": {},
   "devDependencies": {
-    "prettier": "3.9.1"
+    "prettier": "3.9.4"
   }
 }
