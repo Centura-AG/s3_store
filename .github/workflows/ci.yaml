@@ -5,6 +5,8 @@ on:
 
 jobs:
   ci:
-    uses: Centura-AG/centura_workflows/.github/workflows/ci.yaml@develop
+    uses: Centura-AG/centura_workflows/.github/workflows/ci.yaml@feature/ci-test-execution
     with:
       app_path: ${{ github.event.repository.name }}
+    secrets:
+      CENTURA_TAGGER_APP_PK: ${{ secrets.CENTURA_TAGGER_APP_PK }}
