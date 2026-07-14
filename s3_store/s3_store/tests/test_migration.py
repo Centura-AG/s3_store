@@ -35,7 +35,7 @@ class TestMigrationUpload(FrappeTestCase):
         )
         doc.flags.copy_from_existing_file = True
         doc.insert(ignore_permissions=True)
-        return path, name, basename
+        return path, doc.name, basename
 
     def _settings(self):
         s = SimpleNamespace(
