@@ -8,3 +8,5 @@ jobs:
     uses: Centura-AG/centura_workflows/.github/workflows/ci.yaml@develop
     with:
       app_path: ${{ github.event.repository.name }}
+    secrets:
+      CENTURA_TAGGER_APP_PK: ${{ secrets.CENTURA_TAGGER_APP_PK }}
