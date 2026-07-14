@@ -6,6 +6,6 @@ on:
 
 jobs:
   linter:
-    uses: Centura-AG/centura_workflows/.github/workflows/linter.yaml@feature/ci-test-execution
+    uses: Centura-AG/centura_workflows/.github/workflows/linter.yaml@develop
     with:
       app_path: ${{ github.event.repository.name }}
