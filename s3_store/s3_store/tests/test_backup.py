@@ -88,7 +88,7 @@ class TestIterS3FileRows(FrappeTestCase):
             "file_size": 10,
             "is_private": 0,
         }
-        with patch.object(frappe.db, "sql", return_value=[row]):
+        with patch.object(frappe, "get_all", return_value=[row]):
             out = backup._iter_s3_file_rows(self._settings())
         self.assertEqual(len(out), 1)
         self.assertEqual(out[0][1], "p/2026/k.txt")
@@ -104,7 +104,7 @@ class TestIterS3FileRows(FrappeTestCase):
             "is_private": 0,
         }
         with (
-            patch.object(frappe.db, "sql", return_value=[row]),
+            patch.object(frappe, "get_all", return_value=[row]),
             patch(
                 "s3_store.s3_store.file_handler._get_settings",
                 return_value=self._settings(),
@@ -123,7 +123,7 @@ class TestIterS3FileRows(FrappeTestCase):
             "is_private": 0,
         }
         with (
-            patch.object(frappe.db, "sql", return_value=[row]),
+            patch.object(frappe, "get_all", return_value=[row]),
             patch(
                 "s3_store.s3_store.file_handler._get_settings",
                 return_value=self._settings(),
@@ -178,7 +178,7 @@ class TestStageS3Files(FrappeTestCase):
         settings = self._settings()
         with (
             patch.object(frappe, "get_cached_doc", return_value=settings),
-            patch.object(frappe.db, "sql", return_value=[row]),
+            patch.object(frappe, "get_all", return_value=[row]),
             patch.object(backup, "_preflight_disk_space"),
             patch(
                 "s3_store.s3_store.s3_client.download_to_path",
@@ -210,7 +210,7 @@ class TestStageS3Files(FrappeTestCase):
         staged_paths_seen = []
         with (
             patch.object(frappe, "get_cached_doc", return_value=settings),
-            patch.object(frappe.db, "sql", return_value=[row]),
+            patch.object(frappe, "get_all", return_value=[row]),
             patch.object(backup, "_preflight_disk_space"),
             patch(
                 "s3_store.s3_store.s3_client.download_to_path",
@@ -241,7 +241,7 @@ class TestStageS3Files(FrappeTestCase):
         try:
             with (
                 patch.object(frappe, "get_cached_doc", return_value=settings),
-                patch.object(frappe.db, "sql", return_value=[row]),
+                patch.object(frappe, "get_all", return_value=[row]),
                 patch.object(backup, "_preflight_disk_space"),
                 patch("s3_store.s3_store.s3_client.download_to_path") as dl,
             ):
