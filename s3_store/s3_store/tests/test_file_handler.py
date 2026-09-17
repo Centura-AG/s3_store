@@ -122,3 +122,110 @@ class TestFileHandler(FrappeTestCase):
         ):
             file_handler.delete_file_data_content(doc)
         dl.assert_not_called()
+
+
+class TestGetSettings(FrappeTestCase):
+    def test_returns_none_when_the_single_is_missing(self):
+        with patch.object(
+            frappe, "get_cached_doc", side_effect=frappe.DoesNotExistError
+        ):
+            self.assertIsNone(file_handler._get_settings())
+
+    def test_returns_none_when_disabled(self):
+        with patch.object(
+            frappe, "get_cached_doc", return_value=_settings_doc(enabled=0)
+        ):
+            self.assertIsNone(file_handler._get_settings())
+
+    def test_returns_the_doc_when_enabled(self):
+        settings = _settings_doc()
+        with patch.object(frappe, "get_cached_doc", return_value=settings):
+            self.assertIs(file_handler._get_settings(), settings)
+
+
+class TestWriteFileEdgeCases(FrappeTestCase):
+    def test_text_content_is_encoded_before_upload(self):
+        doc = _fake_doc(_content="hello", content_type=None, file_name="hello.txt")
+        with (
+            patch.object(file_handler, "_get_settings", return_value=_settings_doc()),
+            patch("s3_store.s3_store.s3_client.upload") as up,
+        ):
+            file_handler.write_file(doc)
+        self.assertEqual(up.call_args.args[1].read(), b"hello")
+        self.assertEqual(up.call_args.args[2], "text/plain")
+
+    def test_upload_failure_is_logged_and_reraised(self):
+        doc = _fake_doc()
+        with (
+            patch.object(file_handler, "_get_settings", return_value=_settings_doc()),
+            patch(
+                "s3_store.s3_store.s3_client.upload",
+                side_effect=RuntimeError("no bucket"),
+            ),
+            patch.object(frappe, "log_error") as log,
+            self.assertRaises(RuntimeError),
+        ):
+            file_handler.write_file(doc)
+        self.assertIn("S3 Store upload", log.call_args.args[1])
+
+
+class TestDeleteFileDataContent(FrappeTestCase):
+    def _doc(self, file_url):
+        return SimpleNamespace(file_url=file_url)
+
+    def test_does_nothing_without_a_recognisable_key(self):
+        with (
+            patch.object(file_handler, "_get_settings", return_value=_settings_doc()),
+            patch("s3_store.s3_store.s3_client.delete") as delete,
+        ):
+            file_handler.delete_file_data_content(self._doc("/files/local.txt"))
+        delete.assert_not_called()
+
+
+class TestExtractKeyFromUrl(FrappeTestCase):
+    def test_returns_none_for_a_serve_url_without_a_key(self):
+        self.assertIsNone(
+            file_handler.extract_key_from_url(f"{file_handler.SERVE_PATH}?other=1")
+        )
+
+    def test_returns_none_for_a_local_path(self):
+        self.assertIsNone(file_handler.extract_key_from_url("/files/local.txt"))
+
+    def test_returns_none_when_s3_is_disabled(self):
+        with patch.object(file_handler, "_get_settings", return_value=None):
+            self.assertIsNone(
+                file_handler.extract_key_from_url("https://b.s3.amazonaws.com/p/k.txt")
+            )
+
+    def test_path_style_url_at_the_configured_endpoint(self):
+        settings = _settings_doc(endpoint_url="https://minio.example.com")
+        with patch.object(file_handler, "_get_settings", return_value=settings):
+            self.assertEqual(
+                file_handler.extract_key_from_url(
+                    "https://minio.example.com/b/p/2026/k.txt"
+                ),
+                "p/2026/k.txt",
+            )
+
+    def test_path_style_url_from_another_host_is_rejected(self):
+        settings = _settings_doc(endpoint_url="https://minio.example.com")
+        with patch.object(file_handler, "_get_settings", return_value=settings):
+            self.assertIsNone(
+                file_handler.extract_key_from_url("https://other.example.com/b/p/k.txt")
+            )
+
+    def test_path_style_url_for_another_bucket_is_rejected(self):
+        settings = _settings_doc(endpoint_url="https://minio.example.com")
+        with patch.object(file_handler, "_get_settings", return_value=settings):
+            self.assertIsNone(
+                file_handler.extract_key_from_url(
+                    "https://minio.example.com/other-bucket/p/k.txt"
+                )
+            )
+
+    def test_path_style_url_without_a_key_is_rejected(self):
+        settings = _settings_doc(endpoint_url="https://minio.example.com")
+        with patch.object(file_handler, "_get_settings", return_value=settings):
+            self.assertIsNone(
+                file_handler.extract_key_from_url("https://minio.example.com/b/")
+            )

@@ -54,3 +54,21 @@ class TestS3StoreSettings(FrappeTestCase):
         self.settings.ignored_doctypes = "Foo\nBar\n\n  Baz  "
         self.settings.save(ignore_permissions=True)
         self.assertEqual(self.settings.get_ignored_doctypes(), {"Foo", "Bar", "Baz"})
+
+    def test_validate_rejects_a_malformed_bucket_name(self):
+        self.settings.enabled = 1
+        self.settings.bucket = "Not_A_Bucket"
+        self.settings.aws_access_key_id = "AKIA"
+        self.settings.aws_secret_access_key = "secret"
+        with self.assertRaises(frappe.ValidationError):
+            self.settings.save(ignore_permissions=True)
+
+    def test_get_ignored_doctypes_is_empty_when_unset(self):
+        self.settings.ignored_doctypes = ""
+        self.settings.save(ignore_permissions=True)
+        self.assertEqual(self.settings.get_ignored_doctypes(), set())
+
+    def test_saving_clears_the_client_cache(self):
+        with patch("s3_store.s3_store.s3_client.clear_client_cache") as clear:
+            self.settings.save(ignore_permissions=True)
+        clear.assert_called_once()
