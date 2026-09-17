@@ -91,3 +91,49 @@ class TestS3Client(FrappeTestCase):
         settings = _settings(endpoint_url="https://minio.example.com")
         url = s3_client.public_url("a/b.png", settings)
         self.assertEqual(url, "https://minio.example.com/test-bucket/a/b.png")
+
+    def test_custom_endpoint_is_passed_to_boto3(self):
+        settings = _settings(endpoint_url="https://minio.example.com")
+        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
+            mboto.client.return_value = MagicMock()
+            s3_client.delete("k", settings)
+        self.assertEqual(
+            mboto.client.call_args.kwargs["endpoint_url"], "https://minio.example.com"
+        )
+
+    def test_download_to_path_calls_download_file(self):
+        settings = _settings()
+        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
+            cl = MagicMock()
+            mboto.client.return_value = cl
+            s3_client.download_to_path("k", "/tmp/k.txt", settings)
+            cl.download_file.assert_called_once_with("test-bucket", "k", "/tmp/k.txt")
+
+    def test_head_calls_head_object(self):
+        settings = _settings()
+        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
+            cl = MagicMock()
+            mboto.client.return_value = cl
+            s3_client.head("k", settings)
+            cl.head_object.assert_called_once_with(Bucket="test-bucket", Key="k")
+
+    def test_verify_connection_probes_write_and_delete(self):
+        settings = _settings()
+        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
+            cl = MagicMock()
+            mboto.client.return_value = cl
+            s3_client.verify_connection(settings)
+        probe_key = cl.put_object.call_args.kwargs["Key"]
+        self.assertTrue(probe_key.startswith(".s3_store_probe_"))
+        cl.delete_object.assert_called_once_with(Bucket="test-bucket", Key=probe_key)
+
+    def test_clear_client_cache_forces_a_new_client(self):
+        settings = _settings()
+        with patch("s3_store.s3_store.s3_client.boto3") as mboto:
+            mboto.client.return_value = MagicMock()
+            s3_client.head("k", settings)
+            s3_client.head("k", settings)
+            self.assertEqual(mboto.client.call_count, 1)
+            s3_client.clear_client_cache()
+            s3_client.head("k", settings)
+            self.assertEqual(mboto.client.call_count, 2)

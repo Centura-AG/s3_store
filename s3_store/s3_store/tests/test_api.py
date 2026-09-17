@@ -119,3 +119,29 @@ class TestStartMigration(FrappeTestCase):
         eq.assert_called_once()
         log = frappe.get_doc("S3 Migration Log", result["log"])
         self.assertEqual(log.status, "Queued")
+
+
+class TestServeKeyValidation(FrappeTestCase):
+    def test_traversal_key_is_rejected(self):
+        with self.assertRaises(frappe.PermissionError):
+            api.serve("p/../../site_config.json")
+
+    def test_absolute_key_is_rejected(self):
+        with self.assertRaises(frappe.PermissionError):
+            api.serve("/etc/passwd")
+
+    def test_encoded_traversal_key_is_rejected(self):
+        with self.assertRaises(frappe.PermissionError):
+            api.serve("p%2F..%2Fsite_config.json")
+
+    def test_disabled_store_does_not_serve(self):
+        fake_doc = MagicMock(is_private=0, file_name="x.png")
+        with (
+            patch.object(frappe.db, "get_value", return_value="FILE-1"),
+            patch.object(frappe, "get_doc", return_value=fake_doc),
+            patch.object(frappe, "get_cached_doc", return_value=MagicMock(enabled=0)),
+            patch("s3_store.s3_store.s3_client.get_object") as get_object,
+            self.assertRaises(frappe.ValidationError),
+        ):
+            api.serve("somekey")
+        get_object.assert_not_called()
